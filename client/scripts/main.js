@@ -6,7 +6,7 @@ const LevelGenerator = require('./level_generator');
 const Physics = require('./physics');
 const Camera = require('./camera');
 
-const POPULATION_SIZE = 50;
+const POPULATION_SIZE = 5;
 
 function Game() {
     this.canvas = document.getElementById('game');

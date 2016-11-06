@@ -298,7 +298,7 @@ const LevelGenerator = require('./level_generator');
 const Physics = require('./physics');
 const Camera = require('./camera');
 
-const POPULATION_SIZE = 50;
+const POPULATION_SIZE = 5;
 
 function Game() {
     this.canvas = document.getElementById('game');
@@ -546,7 +546,8 @@ const MathHelpers = {
     },
     percentOf: (percent, value) => {
         return (percent / 100) * value;
-    }
+    },
+    randomClamped: () => {return Math.random() - Math.random();}
 };
 
 module.exports = {

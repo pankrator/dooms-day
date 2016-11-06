@@ -64,7 +64,8 @@ const MathHelpers = {
     },
     percentOf: (percent, value) => {
         return (percent / 100) * value;
-    }
+    },
+    randomClamped: () => {return Math.random() - Math.random();}
 };
 
 module.exports = {
