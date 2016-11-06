@@ -1,0 +1,115 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.unselectable {
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.logo,
+.mini-logo {
+  font-size: 5em;
+  text-align: center;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  text-shadow: 2px 2px black;
+}
+.logo .bacon-part,
+.mini-logo .bacon-part {
+  font-family: "TasteTheBacon";
+}
+.logo .spam-part,
+.mini-logo .spam-part {
+  font-family: Calibri;
+}
+.mini-logo {
+  font-size: 2em;
+  float: left;
+  cursor: pointer;
+  border-right: 4px solid snow;
+  margin: 3.33333333vh;
+  padding-right: 20px;
+}
+.subtitle {
+  text-align: center;
+  font-size: 3em;
+  font-family: Calibri;
+  text-shadow: 2px 2px black;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  z-index: -9999;
+}
+header {
+  background-color: #383A35;
+  position: fixed;
+  width: 100vw;
+  height: 10vh;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+header ul {
+  float: right;
+}
+header ul li {
+  cursor: pointer;
+  display: inline;
+  list-style-type: none;
+  padding-right: 10vh;
+  font-size: 4vh;
+}
+main {
+  width: 100vw;
+  height: 90vh;
+  top: 10vh;
+  left: 0;
+  position: absolute;
+  color: #DDD;
+  font-family: Segoe UI;
+}
+canvas {
+  border: 1px solid black;
+}
+.canvas-container {
+  width: 75%;
+  height: 85vh;
+  float: left;
+  background-color: #DDD;
+  color: dimgrey;
+}
+nav {
+  font-size: 1.65em;
+  background-color: #DDD;
+  color: dimgrey;
+  height: 100%;
+  border-left: 3px solid dimgrey;
+  margin-top: -50px;
+  font-family: Segoe UI;
+}
+#tracker-description p,
+#tracker-description li {
+  font-size: 1rem;
+}
+.link--nukun {
+  font-family: Segoe UI;
+}
+#realtime-tracker-description {
+  border-bottom: 3px solid white;
+}
