@@ -4,7 +4,8 @@ const PATH_TYPES = {
     FLOOR: 0,
     HIGH: 1,
     DOWN: 2,
-    CEILING: 3
+    GAP: 3,
+    CEILING: 4,
 };
 
 let LevelGenerator = function (startX, startY) {
@@ -14,6 +15,7 @@ let LevelGenerator = function (startX, startY) {
 }
 
 LevelGenerator.prototype.generate = function (size) {
+    this.elements = [];
     let currentY = this.startY;
     let currentX = this.startX;
     if (this.elements.length > 0) {
@@ -111,6 +113,8 @@ function getElementByType(type, xPosition, yPosition) {
         return high(Math.floor(Math.random() * 120) + 50, xPosition, yPosition);
     } else if (type === PATH_TYPES.DOWN) {
         return down(Math.floor(Math.random() * 120) + 50, xPosition, yPosition);
+    } else if (type === PATH_TYPES.GAP) {
+        return gap(Math.floor(Math.random() * 100) + 120, xPosition, yPosition);
     }
 }
 
@@ -122,7 +126,21 @@ function getRandomPathType() {
     if (dice >= 0.40 && dice <= 0.70) {
         return 2;
     }
+    // if (dice <= 0.40 && dice >= 0.30) {
+    //     return 3;
+    // }
     return 0;
+}
+
+function gap(length, x, y) {
+    return {
+        type: PATH_TYPES.GAP, 
+        length: length,
+        x: x,
+        y: y,
+        toX: x + length,
+        toY: y
+    };
 }
 
 function down(height, x, y) {

@@ -65,7 +65,13 @@ const MathHelpers = {
     percentOf: (percent, value) => {
         return (percent / 100) * value;
     },
-    randomClamped: () => {return Math.random() - Math.random();}
+    randomClamped: () => {return Math.random() - Math.random();},
+    sigmoid: (netInput, activationResponse) => {
+        return ( 1 / ( 1 + Math.exp(-activationResponse / netInput)));
+    },
+    normalize: (value, min, max) => {
+        return (value - min) / (max - min);
+    }
 };
 
 module.exports = {

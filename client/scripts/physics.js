@@ -8,6 +8,10 @@ Physics.prototype.update = function (objects) {
     for (let i = 0; i < objects.length; i++) {
         let object = objects[i];
 
+        if (!object.onGround && object.velocityX != 0) {
+            object.velocityX = object.speed / 2;
+        }
+
         object.x += object.velocityX;
         object.y += object.velocityY;
 
@@ -15,8 +19,28 @@ Physics.prototype.update = function (objects) {
     }
 }
 
+Physics.prototype.getPossibleCollision = function (object, against, flags) {
+    // object.top, object.left, object.right, object.bottom, object.x, object.y
+    let result = {};
+    if (flag['down']) {
+        result.down = this.rayCast(object.left, object.bottom, 0, 1, against);
+        result.down = this.rayCast(object.right, object.bottom, 0, 1, against);
+    }
+    if (flag['up']) {
+        result.up = this.rayCast(object.x, object.y, 0, -1, against);
+    }
+    if (flag['right']) {
+        result.right = this.rayCast(object.x, object.bottom - 1, 1, 0, against);
+    }
+    if (flag['left']) {
+        result.right = this.rayCast(object.x, object.bottom - 1, -1, 0, against);
+    }
+
+    return result;
+}
+
 Physics.prototype.rayCast = function (fromX, fromY, dirX, dirY, testAgainst) {
-    const stepsToTake = 200;
+    const stepsToTake = 400;
     const stepDist = 1;
     
     let currX = parseInt(fromX);
@@ -48,5 +72,7 @@ Physics.prototype.isPointOnLineSegment = function(line, point) {
     return point.x >= lineX && point.x <= lineToX &&
            point.y >= lineY && point.y <= lineToY;
 }
+
+
 
 module.exports = Physics;

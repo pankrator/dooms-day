@@ -9,16 +9,17 @@ var utils = require('./utils');
 var percentOf = utils.MathHelpers.percentOf;
 
 
-var Character = function (x, y) {
+var Character = function (x, y, color) {
     this.x = x;
     this.y = y;
     this.speed = 2;
     this.muscles = 5;
-    this.height = 200;
+    this.height = 150;
 
     this.velocityY = 0;
     this.velocityX = 0;
 
+    this.color = color || 'red';
     this.onGround = true;
     this.randomHeadDisplacement = -DISPLACEMENT_HEAD_LIMIT;
     this.randomHeadDisplacementStep = DISPLACEMENT_HEAD_STEP;
@@ -45,6 +46,13 @@ Character.prototype.update = function () {
     this.bodyUpperY = this.y - (this.height / 2) + this.headR;
     this.bodyBottomY = this.y - (this.height / 2) + this.headR + this.bodyLength;
     this.bottom = this.bodyBottomY + (this.height / 2);
+
+    if (this.muscles > 7) {
+        this.muscles = 7;
+    }
+    if (this.muscles <= 2) {
+        this.muscles = 2;
+    }
 }
 
 Character.prototype.setHeight = function (height) {
@@ -80,7 +88,7 @@ Character.prototype.render = function (ctx) {
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.fillStyle = "red";
+    ctx.fillStyle = this.color;
     // Draw left leg
     ctx.rect(this.x - this.legBaseWidth / 2,
              this.bodyBottomY,

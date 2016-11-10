@@ -2,7 +2,7 @@ module.exports = function(grunt) {
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
     watch: {
-      files: ['client/scripts/*.js', 'client/styles/*.less'],
+      files: ['client/scripts/**/*.js', 'client/styles/*.less'],
       tasks: ['browserify', 'less']
     },
     browserify: {
