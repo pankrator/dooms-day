@@ -8,8 +8,7 @@ const DISPLACEMENT_HEAD_LIMIT = 10;
 var utils = require('./utils');
 var percentOf = utils.MathHelpers.percentOf;
 
-
-var Character = function (x, y, color) {
+var Character = function (x, y, color, images) {
     this.x = x;
     this.y = y;
     this.speed = 2;
@@ -19,7 +18,9 @@ var Character = function (x, y, color) {
     this.velocityY = 0;
     this.velocityX = 0;
 
+    this.images = images;
     this.color = color || 'red';
+
     this.onGround = true;
     this.randomHeadDisplacement = -DISPLACEMENT_HEAD_LIMIT;
     this.randomHeadDisplacementStep = DISPLACEMENT_HEAD_STEP;
@@ -80,8 +81,9 @@ Character.prototype.render = function (ctx) {
     ctx.arc(this.headX, this.headY, this.headR, 0, 2 * Math.PI, 0);
 
     //Draw body
-    ctx.moveTo(this.x, this.bodyUpperY);
-    ctx.lineTo(this.x, this.bodyBottomY);
+    ctx.drawImage(this.images[0], this.x - this.legBaseWidth / 2 + 5, this.bodyUpperY);
+    // ctx.moveTo(this.x, this.bodyUpperY);
+    // ctx.lineTo(this.x, this.bodyBottomY);
 
     // Draw leg base
     ctx.moveTo(this.x - this.legBaseWidth / 2, this.bodyBottomY);
@@ -92,17 +94,19 @@ Character.prototype.render = function (ctx) {
     ctx.beginPath();
     ctx.fillStyle = this.color;
     // Draw left leg
-    ctx.rect(this.x - this.legBaseWidth / 2,
-             this.bodyBottomY,
-             percentOf(this.muscles * 10, this.legBaseWidth / 2),
-             this.bottom - this.bodyBottomY);
+    ctx.drawImage(this.images[1], this.x - this.legBaseWidth / 2, this.bodyBottomY);
+    // ctx.rect(this.x - this.legBaseWidth / 2,
+    //          this.bodyBottomY,
+    //          percentOf(this.muscles * 10, this.legBaseWidth / 2),
+    //          this.bottom - this.bodyBottomY);
 
     // Draw right leg
-    ctx.rect(this.x + this.legBaseWidth / 2,
-             this.bodyBottomY,
-             -percentOf(this.muscles * 10, this.legBaseWidth / 2),
-             this.bottom - this.bodyBottomY);
-    ctx.fill();
+    ctx.drawImage(this.images[1], this.x, this.bodyBottomY);
+    // ctx.rect(this.x + this.legBaseWidth / 2,
+    //          this.bodyBottomY,
+    //          -percentOf(this.muscles * 10, this.legBaseWidth / 2),
+    //          this.bottom - this.bodyBottomY);
+    // ctx.fill();
 }
 
 module.exports = Character;

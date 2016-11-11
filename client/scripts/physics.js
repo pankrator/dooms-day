@@ -16,6 +16,10 @@ Physics.prototype.update = function (objects) {
         object.y += object.velocityY;
 
         object.velocityY += WORLD_GRAVITY;
+
+        if (object.velocityY > 20) {
+            object.velocityY = 20;
+        } 
     }
 }
 

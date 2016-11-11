@@ -39,8 +39,7 @@ const DISPLACEMENT_HEAD_LIMIT = 10;
 var utils = require('./utils');
 var percentOf = utils.MathHelpers.percentOf;
 
-
-var Character = function (x, y, color) {
+var Character = function (x, y, color, images) {
     this.x = x;
     this.y = y;
     this.speed = 2;
@@ -50,7 +49,9 @@ var Character = function (x, y, color) {
     this.velocityY = 0;
     this.velocityX = 0;
 
+    this.images = images;
     this.color = color || 'red';
+
     this.onGround = true;
     this.randomHeadDisplacement = -DISPLACEMENT_HEAD_LIMIT;
     this.randomHeadDisplacementStep = DISPLACEMENT_HEAD_STEP;
@@ -111,8 +112,9 @@ Character.prototype.render = function (ctx) {
     ctx.arc(this.headX, this.headY, this.headR, 0, 2 * Math.PI, 0);
 
     //Draw body
-    ctx.moveTo(this.x, this.bodyUpperY);
-    ctx.lineTo(this.x, this.bodyBottomY);
+    ctx.drawImage(this.images[0], this.x - this.legBaseWidth / 2 + 5, this.bodyUpperY);
+    // ctx.moveTo(this.x, this.bodyUpperY);
+    // ctx.lineTo(this.x, this.bodyBottomY);
 
     // Draw leg base
     ctx.moveTo(this.x - this.legBaseWidth / 2, this.bodyBottomY);
@@ -123,21 +125,54 @@ Character.prototype.render = function (ctx) {
     ctx.beginPath();
     ctx.fillStyle = this.color;
     // Draw left leg
-    ctx.rect(this.x - this.legBaseWidth / 2,
-             this.bodyBottomY,
-             percentOf(this.muscles * 10, this.legBaseWidth / 2),
-             this.bottom - this.bodyBottomY);
+    ctx.drawImage(this.images[1], this.x - this.legBaseWidth / 2, this.bodyBottomY);
+    // ctx.rect(this.x - this.legBaseWidth / 2,
+    //          this.bodyBottomY,
+    //          percentOf(this.muscles * 10, this.legBaseWidth / 2),
+    //          this.bottom - this.bodyBottomY);
 
     // Draw right leg
-    ctx.rect(this.x + this.legBaseWidth / 2,
-             this.bodyBottomY,
-             -percentOf(this.muscles * 10, this.legBaseWidth / 2),
-             this.bottom - this.bodyBottomY);
-    ctx.fill();
+    ctx.drawImage(this.images[1], this.x, this.bodyBottomY);
+    // ctx.rect(this.x + this.legBaseWidth / 2,
+    //          this.bodyBottomY,
+    //          -percentOf(this.muscles * 10, this.legBaseWidth / 2),
+    //          this.bottom - this.bodyBottomY);
+    // ctx.fill();
 }
 
 module.exports = Character;
-},{"./utils":9}],3:[function(require,module,exports){
+},{"./utils":10}],3:[function(require,module,exports){
+'use strict';
+
+let ContentManager = function() {
+    this.images = {};
+};
+
+ContentManager.prototype.loadImages = function (images) {
+    let loaded = 0;
+    let deffered = Q.defer();
+    images.forEach((src) => {
+        const image = new Image();
+        image.src = src;
+        image.onload = () => {
+            const name = src.substring(src.lastIndexOf('/') + 1);
+            this.images[name] = image;
+            loaded++;
+            if (loaded == images.length) {
+                deffered.resolve();
+            }
+        };
+    });
+
+    return deffered.promise;
+}
+
+ContentManager.prototype.getImage = function (name) {
+    return this.images[name];
+}
+
+module.exports = ContentManager;
+},{}],4:[function(require,module,exports){
 'use strict';
 
 const MathHelpers = require('../utils').MathHelpers;
@@ -225,7 +260,7 @@ let Genome = function () {
 }
 
 module.exports = GeneticAlgorithm;
-},{"../utils":9}],4:[function(require,module,exports){
+},{"../utils":10}],5:[function(require,module,exports){
 'use strict';
 
 const MathHelpers = require('../utils').MathHelpers;
@@ -343,7 +378,7 @@ let Layer = function (numberOfNeurons, inputsPerNeuron) {
 }
 
 module.exports = NeuralNet;
-},{"../utils":9}],5:[function(require,module,exports){
+},{"../utils":10}],6:[function(require,module,exports){
 'use strict';
 
 const PATH_TYPES = {
@@ -391,6 +426,19 @@ LevelGenerator.prototype.getFloorsByPosition = function (character) {
         if (this.elements[i].type == PATH_TYPES.FLOOR) {
             result.push(this.elements[i]);
         }
+    }
+
+    return result;
+}
+
+LevelGenerator.prototype.getNearestElements = function (x, y) {
+    let result = [];
+
+    let index = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && x >= el.x && x <= el.toX });
+    index = Math.max(index - 6, 0);
+    const until = Math.min(this.elements.length, index + 15);
+    for (let i = index; i < until; i++) {
+        result.push(this.elements[i]);
     }
 
     return result;
@@ -523,7 +571,7 @@ function floor(length, x, y) {
 }
 
 module.exports = LevelGenerator;
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 "use strict";
 
 const MathHelpers = require("./utils").MathHelpers;
@@ -534,6 +582,7 @@ const Camera = require('./camera');
 const NeuralNet = require('./genetic/neural_net');
 const GeneticAlgorithm = require('./genetic/genetic_algorithm');
 const Renderer = require('./renderer');
+const ContentManager = require('./content_manager');
 
 const NUMBER_OF_INPUTS = 2;
 const NUMBER_OF_HIDDEN_LAYERS = 1;
@@ -561,12 +610,13 @@ function Game() {
     this.characterControllers = [];
     this.keys = new Array(300);
     this.characters = [];
-    this.testCharacter = new Character(100, 300);
+    this.testCharacter = null;
     this.levelGenerator = new LevelGenerator(40, 460);
     this.physics = new Physics();
     this.camera = new Camera({x: 600, y: 600}, {x: 30000, y: 30000});
     this.currentSimStep = 0;
     this.renderer = new Renderer();
+    this.contentManager = new ContentManager();
 };
 
 Game.prototype.render = function () {
@@ -626,9 +676,6 @@ Game.prototype.renderSimulation = function () {
 }
 
 Game.prototype.doAction = function (character, controller, inputs) {
-    if (character == this.bestCharacter && inputs[0]) {
-        // console.log('input', inputs);
-    }
     inputs[0] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
     inputs[1] = MathHelpers.normalize(inputs[1] || 200, 5, 200);
     const outputs = controller.activate(inputs);
@@ -648,15 +695,16 @@ Game.prototype.doAction = function (character, controller, inputs) {
 }
 
 Game.prototype.update = function () {
-    this.camera.follow(this.testCharacter);
-
-    
     var character = this.testCharacter;
+
+    this.camera.follow(character);
+
     // first get possible collisions using physics agains level elements
     character.onGround = false;
     character.velocityX = 0;
 
-    let collisions = this.physics.getPossibleCollision(character, this.levelGenerator.getElements(), {down: true, right: true, left: true});
+    const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
+    let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
     collisions.down.forEach((collision) => {
         if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
             character.onGround = true;
@@ -673,7 +721,6 @@ Game.prototype.update = function () {
     });
 
     collisions.left.forEach((collision) => {
-        console.log(collision);
         if (character.x - character.legBaseWidth / 2 + character.velocityX <= collision.object.x) {
             character.x = collision.object.x + character.legBaseWidth / 2;
             character.velocityX = 0;
@@ -682,52 +729,8 @@ Game.prototype.update = function () {
 
     this.handleInput();
 
-    if (character.velocityY > 20) {
-        character.velocityY = 20;
-    }
-
     this.physics.update([character]);
 
-
-    // let levelData = this.levelGenerator.getDataByPosition(character);
-
-    // if (levelData) {
-    //     let collision = this.physics.rayCast(character.x, character.bottom - 5, 1, 0, [levelData.nextObstacle]);
-    //     if (collision) {
-    //         if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
-    //             character.x = collision.object.x - character.legBaseWidth / 2;
-    //             character.velocityX = 0;
-    //         }
-    //     }
-
-        // let floors = this.levelGenerator.getFloorsByPosition(character);
-        /**
-         * Subtract the velocityY from character.y because otherwise if height is less than velocityY
-         * it might happen that next starting point of raycast is under the floor and thus there will be
-         * reported no collision 
-         */
-
-        // let collisionLeft = this.physics.rayCast(character.x - character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
-        // let collisionRight = this.physics.rayCast(character.x + character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
-
-        // if (!collisionRight) {
-        //     collision = collisionLeft;
-        // } else if (!collisionLeft) {
-        //     collision = collisionRight;
-        // } else if (Math.abs(collisionLeft.object.y - character.bottom) < Math.abs(collisionRight.object.y - character.bottom)) {
-        //     collision = collisionLeft;
-        // } else {
-        //     collision = collisionRight;
-        // }
-
-        // if (collision) {
-        //     if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
-        //         character.onGround = true;
-        //         character.velocityY = 0;
-        //         character.y = collision.object.y - character.height / 2;
-        //     }
-        // }
-    // }
     character.update();
 
     this.render();
@@ -840,32 +843,49 @@ Game.prototype.handleInput = function () {
     }
 }
 
+Game.prototype.__loadContent = function () {
+    return this.contentManager.loadImages(['resources/body.png',
+                                    'resources/left.png']);
+    
+}
+
 Q.longStackSupport = true;
 Game.prototype.main = function main() {
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
     window.addEventListener('keyup', this.handleKeyUp.bind(this));
-    
-    for (let i = 0; i < POPULATION_SIZE; i++) {
-        const character = new Character(100, 300, colors[i % colors.length]);
-        this.characters.push(character);
 
-        this.characterControllers.push(new NeuralNet(NUMBER_OF_INPUTS, NUMBER_OF_OUTPUTS,
-                                                    NUMBER_OF_HIDDEN_LAYERS, NUMBER_OF_NODES_PER_HIDDEN));
-    }
-    this.evolutionController = new GeneticAlgorithm(POPULATION_SIZE, this.characterControllers[0].getNumberOfWeights());
-    this.evolutionController.generateRandomPopulation();
-    this.characterControllers.forEach((controller, index) => {
-        this.characterControllers[index].updateWeights(this.evolutionController.individuals[index].weights);
+    const contentLoadPromise = this.__loadContent();
+
+    contentLoadPromise.then(() => {
+        const characterImages = [this.contentManager.getImage('body.png'), 
+                                 this.contentManager.getImage('left.png')];
+
+        this.testCharacter = new Character(100, 300, "red", characterImages);
+
+        for (let i = 0; i < POPULATION_SIZE; i++) {
+            
+            const character = new Character(100, 300, colors[i % colors.length], characterImages);
+            this.characters.push(character);
+
+            this.characterControllers.push(new NeuralNet(NUMBER_OF_INPUTS, NUMBER_OF_OUTPUTS,
+                                                        NUMBER_OF_HIDDEN_LAYERS, NUMBER_OF_NODES_PER_HIDDEN));
+        }
+        this.evolutionController = new GeneticAlgorithm(POPULATION_SIZE, this.characterControllers[0].getNumberOfWeights());
+        this.evolutionController.generateRandomPopulation();
+        this.characterControllers.forEach((controller, index) => {
+            this.characterControllers[index].updateWeights(this.evolutionController.individuals[index].weights);
+        });
+
+        this.levelGenerator.generate(700);
+
+        this.update();
     });
 
-    this.levelGenerator.generate(700);
-
-    this.update();
 };
 let game = new Game();
 game.main();
 
-},{"./camera":1,"./character":2,"./genetic/genetic_algorithm":3,"./genetic/neural_net":4,"./level_generator":5,"./physics":7,"./renderer":8,"./utils":9}],7:[function(require,module,exports){
+},{"./camera":1,"./character":2,"./content_manager":3,"./genetic/genetic_algorithm":4,"./genetic/neural_net":5,"./level_generator":6,"./physics":8,"./renderer":9,"./utils":10}],8:[function(require,module,exports){
 'use strict';
 
 const WORLD_GRAVITY = 0.3;
@@ -884,6 +904,10 @@ Physics.prototype.update = function (objects) {
         object.y += object.velocityY;
 
         object.velocityY += WORLD_GRAVITY;
+
+        if (object.velocityY > 20) {
+            object.velocityY = 20;
+        } 
     }
 }
 
@@ -959,7 +983,7 @@ Physics.prototype.isPointOnLineSegment = function(line, point) {
 
 
 module.exports = Physics;
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 'use strict';
 
 let Renderer = function () {}
@@ -984,7 +1008,7 @@ Renderer.prototype.clearCanvas = function (canvas, context) {
 
 
 module.exports = Renderer;
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 "use strict";
 
 function sendData(path, verb, body) {
@@ -1068,7 +1092,7 @@ module.exports = {
     MathHelpers: MathHelpers,
 };
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
 
 function Vector(x, y) {
@@ -1285,4 +1309,4 @@ Vector.angleBetween = function (a, b) {
 
 module.exports = Vector;
 
-},{}]},{},[1,2,5,6,7,8,9,10]);
+},{}]},{},[1,2,3,6,7,8,9,10,11]);
