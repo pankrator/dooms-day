@@ -33,6 +33,7 @@ function Game() {
     this.statsCanvas = document.getElementById('stats');
     this.statsContext = this.statsCanvas.getContext('2d');
     this.characterControllers = [];
+    this.keys = new Array(300);
     this.characters = [];
     this.testCharacter = new Character(100, 300);
     this.levelGenerator = new LevelGenerator(40, 460);
@@ -50,6 +51,7 @@ Game.prototype.render = function () {
 
     const elements = this.levelGenerator.getElements();
     this.context.beginPath();
+    this.context.lineWidth = 10;
     this.context.strokeStyle = "blue";
     elements.forEach((el) => {
         if (el.type === 3) {
@@ -59,6 +61,7 @@ Game.prototype.render = function () {
         this.context.lineTo(el.toX, el.toY);
     });
     this.context.stroke();
+    this.context.lineWidth = 1;
     
     this.testCharacter.render(this.context);
 
@@ -124,51 +127,81 @@ Game.prototype.update = function () {
     
     var character = this.testCharacter;
     // first get possible collisions using physics agains level elements
-    this.physics.update([character]);
+    character.onGround = false;
+    character.velocityX = 0;
+
+    let collisions = this.physics.getPossibleCollision(character, this.levelGenerator.getElements(), {down: true, right: true, left: true});
+    collisions.down.forEach((collision) => {
+        if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
+            character.onGround = true;
+            character.velocityY = 0;
+            character.y = collision.object.y - character.height / 2;
+        }
+    });
+
+    collisions.right.forEach((collision) => {
+        if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
+            character.x = collision.object.x - character.legBaseWidth / 2;
+            character.velocityX = 0;
+        }
+    });
+
+    collisions.left.forEach((collision) => {
+        console.log(collision);
+        if (character.x - character.legBaseWidth / 2 + character.velocityX <= collision.object.x) {
+            character.x = collision.object.x + character.legBaseWidth / 2;
+            character.velocityX = 0;
+        }
+    });
+
+    this.handleInput();
 
     if (character.velocityY > 20) {
         character.velocityY = 20;
     }
-    character.onGround = false;
 
-    let levelData = this.levelGenerator.getDataByPosition(character);
+    this.physics.update([character]);
 
-    if (levelData) {
-        let collision = this.physics.rayCast(character.x, character.bottom - 5, 1, 0, [levelData.nextObstacle]);
-        if (collision) {
-            if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
-                character.x = collision.object.x - character.legBaseWidth / 2;
-                character.velocityX = 0;
-            }
-        }
 
-        let floors = this.levelGenerator.getFloorsByPosition(character);
+    // let levelData = this.levelGenerator.getDataByPosition(character);
+
+    // if (levelData) {
+    //     let collision = this.physics.rayCast(character.x, character.bottom - 5, 1, 0, [levelData.nextObstacle]);
+    //     if (collision) {
+    //         if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
+    //             character.x = collision.object.x - character.legBaseWidth / 2;
+    //             character.velocityX = 0;
+    //         }
+    //     }
+
+        // let floors = this.levelGenerator.getFloorsByPosition(character);
         /**
-         * Subtract the velocityY from character.y because otherwise if height is less than velocityX
+         * Subtract the velocityY from character.y because otherwise if height is less than velocityY
          * it might happen that next starting point of raycast is under the floor and thus there will be
          * reported no collision 
          */
-        let collisionLeft = this.physics.rayCast(character.x - character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
-        let collisionRight = this.physics.rayCast(character.x + character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
 
-        if (!collisionRight) {
-            collision = collisionLeft;
-        } else if (!collisionLeft) {
-            collision = collisionRight;
-        } else if (Math.abs(collisionLeft.object.y - character.bottom) < Math.abs(collisionRight.object.y - character.bottom)) {
-            collision = collisionLeft;
-        } else {
-            collision = collisionRight;
-        }
+        // let collisionLeft = this.physics.rayCast(character.x - character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
+        // let collisionRight = this.physics.rayCast(character.x + character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
 
-        if (collision) {
-            if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
-                character.onGround = true;
-                character.velocityY = 0;
-                character.y = collision.object.y - character.height / 2;
-            }
-        }
-    }
+        // if (!collisionRight) {
+        //     collision = collisionLeft;
+        // } else if (!collisionLeft) {
+        //     collision = collisionRight;
+        // } else if (Math.abs(collisionLeft.object.y - character.bottom) < Math.abs(collisionRight.object.y - character.bottom)) {
+        //     collision = collisionLeft;
+        // } else {
+        //     collision = collisionRight;
+        // }
+
+        // if (collision) {
+        //     if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
+        //         character.onGround = true;
+        //         character.velocityY = 0;
+        //         character.y = collision.object.y - character.height / 2;
+        //     }
+        // }
+    // }
     character.update();
 
     this.render();
@@ -242,19 +275,12 @@ Game.prototype.updateSimulation = function () {
     setTimeout(this.updateSimulation.bind(this), 1000 / 60);
 }
 
+Game.prototype.handleKeyUp = function (event) {
+    this.keys[event.keyCode] = false;
+}
+
 Game.prototype.handleKeyDown = function (event) {
-    if (event.keyCode >= 49 && event.keyCode <= 57) {
-        this.characterToFollow = this.characters[event.keyCode - 48];
-    }
-    if (event.keyCode === 37) {
-        this.testCharacter.velocityX = -this.testCharacter.speed;
-    }
-    if (event.keyCode === 39) {
-        this.testCharacter.velocityX = this.testCharacter.speed;
-    }
-    if (event.keyCode === 32 /* Space */)  {
-        this.testCharacter.jump();
-    }
+    this.keys[event.keyCode] = true;
 };
 
 Game.prototype.evaluateAndReset = function () {
@@ -275,9 +301,23 @@ Game.prototype.evaluateAndReset = function () {
     });
 }
 
+Game.prototype.handleInput = function () {
+    if (this.keys[37]) {
+        this.testCharacter.velocityX = -this.testCharacter.speed;
+    }
+    
+    if (this.keys[39]) {
+        this.testCharacter.velocityX = this.testCharacter.speed;
+    }
+    if (this.keys[32])  {
+        this.testCharacter.jump();
+    }
+}
+
 Q.longStackSupport = true;
 Game.prototype.main = function main() {
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
+    window.addEventListener('keyup', this.handleKeyUp.bind(this));
     
     for (let i = 0; i < POPULATION_SIZE; i++) {
         const character = new Character(100, 300, colors[i % colors.length]);

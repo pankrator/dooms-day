@@ -46,6 +46,8 @@ Character.prototype.update = function () {
     this.bodyUpperY = this.y - (this.height / 2) + this.headR;
     this.bodyBottomY = this.y - (this.height / 2) + this.headR + this.bodyLength;
     this.bottom = this.bodyBottomY + (this.height / 2);
+    this.left = this.x - this.legBaseWidth / 2;
+    this.right = this.x + this.legBaseWidth / 2;
 
     if (this.muscles > 7) {
         this.muscles = 7;

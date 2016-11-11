@@ -8,9 +8,9 @@ Physics.prototype.update = function (objects) {
     for (let i = 0; i < objects.length; i++) {
         let object = objects[i];
 
-        if (!object.onGround && object.velocityX != 0) {
-            object.velocityX = object.speed / 2;
-        }
+        // if (!object.onGround && object.velocityX != 0) {
+        //     object.velocityX = Math.sign(object.velocityX) * (object.speed / 2);
+        // }
 
         object.x += object.velocityX;
         object.y += object.velocityY;
@@ -22,25 +22,40 @@ Physics.prototype.update = function (objects) {
 Physics.prototype.getPossibleCollision = function (object, against, flags) {
     // object.top, object.left, object.right, object.bottom, object.x, object.y
     let result = {};
-    if (flag['down']) {
-        result.down = this.rayCast(object.left, object.bottom, 0, 1, against);
-        result.down = this.rayCast(object.right, object.bottom, 0, 1, against);
+    if (flags['down']) {
+        result.down = [];
+        const floors = against.filter((el) => { return el.type === 0; });
+
+        let leftLeg = this.rayCast(object.left, object.bottom, 0, 1, floors, 100);
+        leftLeg && result.down.push(leftLeg);
+
+        let rightLeg = this.rayCast(object.right, object.bottom, 0, 1, floors, 100)
+        rightLeg && result.down.push(rightLeg);
     }
-    if (flag['up']) {
-        result.up = this.rayCast(object.x, object.y, 0, -1, against);
+    if (flags['up']) {
+        result.up = [];
+
+        let toUp = this.rayCast(object.x, object.y, 0, -1, against, 100);
+        toUp && result.up.push(toUp);
     }
-    if (flag['right']) {
-        result.right = this.rayCast(object.x, object.bottom - 1, 1, 0, against);
+    if (flags['right']) {
+        result.right = [];
+
+        let toRight = this.rayCast(object.x, object.bottom - 1, 1, 0, against, 100);
+        toRight && result.right.push(toRight); 
     }
-    if (flag['left']) {
-        result.right = this.rayCast(object.x, object.bottom - 1, -1, 0, against);
+    if (flags['left']) {
+        result.left = [];
+
+        let toLeft = this.rayCast(object.x, object.bottom - 1, -1, 0, against, 100);
+        toLeft && result.left.push(toLeft)
     }
 
     return result;
 }
 
-Physics.prototype.rayCast = function (fromX, fromY, dirX, dirY, testAgainst) {
-    const stepsToTake = 400;
+Physics.prototype.rayCast = function (fromX, fromY, dirX, dirY, testAgainst, steps) {
+    const stepsToTake = steps || 400;
     const stepDist = 1;
     
     let currX = parseInt(fromX);
