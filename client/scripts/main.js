@@ -126,8 +126,9 @@ Game.prototype.update = function () {
     this.camera.follow(character);
 
     // first get possible collisions using physics agains level elements
-    character.onGround = false;
     character.velocityX = 0;
+
+    this.handleInput();
 
     const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
     let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
@@ -153,7 +154,6 @@ Game.prototype.update = function () {
         }
     });
 
-    this.handleInput();
 
     this.physics.update([character]);
 

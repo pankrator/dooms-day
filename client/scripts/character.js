@@ -12,7 +12,7 @@ var Character = function (x, y, color, images) {
     this.x = x;
     this.y = y;
     this.speed = 2;
-    this.muscles = 5;
+    this.muscles = 7;
     this.height = 150;
 
     this.velocityY = 0;
@@ -79,34 +79,24 @@ Character.prototype.render = function (ctx) {
     ctx.strokeStyle = 'black';
     ctx.beginPath();
     ctx.arc(this.headX, this.headY, this.headR, 0, 2 * Math.PI, 0);
-
-    //Draw body
-    ctx.drawImage(this.images[0], this.x - this.legBaseWidth / 2 + 5, this.bodyUpperY);
-    // ctx.moveTo(this.x, this.bodyUpperY);
-    // ctx.lineTo(this.x, this.bodyBottomY);
-
-    // Draw leg base
-    ctx.moveTo(this.x - this.legBaseWidth / 2, this.bodyBottomY);
-    ctx.lineTo(this.x + this.legBaseWidth / 2, this.bodyBottomY);
-
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.fillStyle = this.color;
+    //Draw body
+    ctx.drawImage(this.images[0], this.x - this.legBaseWidth / 2, this.bodyUpperY, this.legBaseWidth, this.bodyLength);
+
     // Draw left leg
-    ctx.drawImage(this.images[1], this.x - this.legBaseWidth / 2, this.bodyBottomY);
-    // ctx.rect(this.x - this.legBaseWidth / 2,
-    //          this.bodyBottomY,
-    //          percentOf(this.muscles * 10, this.legBaseWidth / 2),
-    //          this.bottom - this.bodyBottomY);
+    const legWidth = percentOf(this.muscles * 15, this.legBaseWidth / 2);
+    ctx.drawImage(this.images[1],
+                  this.x - this.legBaseWidth / 2 + percentOf(10, this.legBaseWidth),
+                  this.bodyBottomY, legWidth,
+                  this.bottom - this.bodyBottomY);
 
     // Draw right leg
-    ctx.drawImage(this.images[1], this.x, this.bodyBottomY);
-    // ctx.rect(this.x + this.legBaseWidth / 2,
-    //          this.bodyBottomY,
-    //          -percentOf(this.muscles * 10, this.legBaseWidth / 2),
-    //          this.bottom - this.bodyBottomY);
-    // ctx.fill();
+    ctx.drawImage(this.images[1],
+                  this.x + this.legBaseWidth / 2 - legWidth + percentOf(10, this.legBaseWidth),
+                  this.bodyBottomY,
+                  legWidth,
+                  this.bottom - this.bodyBottomY);
 }
 
 module.exports = Character;
