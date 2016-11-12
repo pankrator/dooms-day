@@ -8,9 +8,9 @@ Physics.prototype.update = function (objects) {
     for (let i = 0; i < objects.length; i++) {
         let object = objects[i];
 
-        // if (!object.onGround && object.velocityX != 0) {
-        //     object.velocityX = Math.sign(object.velocityX) * (object.speed / 2);
-        // }
+        if (!object.onGround && object.velocityX != 0) {
+            object.velocityX = Math.sign(object.velocityX) * (object.speed / 2);
+        }
 
         object.x += object.velocityX;
         object.y += object.velocityY;

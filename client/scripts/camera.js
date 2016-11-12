@@ -12,11 +12,11 @@ Camera.prototype.follow = function (target) {
     position.x = target.x - this.viewport.x / 2;
     position.y = target.y - this.viewport.y / 2;
 
-    if (position.x < 0) {
-        position.x = 0;
+    if (position.x < -1000) {
+        position.x = -1000;
     }
-    if (position.y < 0) {
-        position.y = 0;
+    if (position.y < -1000) {
+        position.y = 1000;
     }
     if (position.x + this.viewport.x > this.platformSize.x) {
         position.x = this.platformSize.x - this.viewport.x;

@@ -63,6 +63,13 @@ LevelGenerator.prototype.getNearestElements = function (x, y) {
     return result;
 }
 
+LevelGenerator.prototype.getNextObstacle = function (x, y, type) {
+    let index = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && x >= el.x && x <= el.toX });
+    while (this.elements[index++].type != type);
+
+    return this.elements[index];
+}
+
 // TODO: Move this somewhere else
 LevelGenerator.prototype.getDataByPosition = function (character) {
     const left = character.x - character.legBaseWidth / 2;

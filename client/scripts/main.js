@@ -79,6 +79,7 @@ Game.prototype.renderSimulation = function () {
 
     const elements = this.levelGenerator.getElements();
     this.context.beginPath();
+    this.context.lineWidth = 10;
     this.context.strokeStyle = "blue";
     elements.forEach((el) => {
         if (el.type === 3) {
@@ -88,6 +89,7 @@ Game.prototype.renderSimulation = function () {
         this.context.lineTo(el.toX, el.toY);
     });
     this.context.stroke();
+    this.context.lineWidth = 1;
 
     this.context.beginPath();
     this.context.fillStyle = "green";
@@ -127,8 +129,7 @@ Game.prototype.update = function () {
 
     // first get possible collisions using physics agains level elements
     character.velocityX = 0;
-
-    this.handleInput();
+    character.onGround = false;
 
     const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
     let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
@@ -139,6 +140,8 @@ Game.prototype.update = function () {
             character.y = collision.object.y - character.height / 2;
         }
     });
+
+    this.handleInput();
 
     collisions.right.forEach((collision) => {
         if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
@@ -156,7 +159,6 @@ Game.prototype.update = function () {
 
 
     this.physics.update([character]);
-
     character.update();
 
     this.render();
@@ -171,59 +173,46 @@ Game.prototype.updateSimulation = function () {
     this.bestCharacter = _.maxBy(this.characters, 'x');
     this.camera.follow(this.characterToFollow || this.bestCharacter);
 
-    this.physics.update(this.characters);
-
     for (let i = 0; i < this.characters.length; i++) {
         let inputs = [];
         let character = this.characters[i];
 
-        if (character.velocityY > 20) {
-            character.velocityY = 20;
-        }
         character.onGround = false;
-
-        let levelData = this.levelGenerator.getDataByPosition(character);
-
-        if (levelData) {
-            let collision = this.physics.rayCast(character.x, character.bottom - 5, 1, 0, [levelData.nextObstacle]);
-            if (collision) {
-                inputs[0] = Math.sqrt((collision.object.x - character.x) * (collision.object.x - character.x));
-                inputs[1] = collision.object.height;
-                if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
-                    character.x = collision.object.x - character.legBaseWidth / 2;
-                    character.velocityX = 0;
-                }
+        const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
+        let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
+        collisions.down.forEach((collision) => {
+            if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
+                character.onGround = true;
+                character.velocityY = 0;
+                character.y = collision.object.y - character.height / 2;
             }
+        });
 
-            let floors = this.levelGenerator.getFloorsByPosition(character);
-            /**
-             * Subtract the velocityY from character.y because otherwise if height is less than velocityX
-             * it might happen that next starting point of raycast is under the floor and thus there will be
-             * reported no collision 
-             */
-            let collisionLeft = this.physics.rayCast(character.x - character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
-            let collisionRight = this.physics.rayCast(character.x + character.legBaseWidth / 2, character.y - character.velocityY * 2, 0, 1, floors);
-
-            if (!collisionRight) {
-                collision = collisionLeft;
-            } else if (!collisionLeft) {
-                collision = collisionRight;
-            } else if (Math.abs(collisionLeft.object.y - character.bottom) < Math.abs(collisionRight.object.y - character.bottom)) {
-                collision = collisionLeft;
-            } else {
-                collision = collisionRight;
-            }
-
-            if (collision) {
-                if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
-                    character.onGround = true;
-                    character.velocityY = 0;
-                    character.y = collision.object.y - character.height / 2;
-                }
-            }
+        const nextObstacle = this.levelGenerator.getNextObstacle(character.x, character.y, 1);
+        let dist = Math.sqrt((nextObstacle.x - character.x) * (nextObstacle.x - character.x));
+        if (dist < 500) {
+            inputs[0] = Math.sqrt((nextObstacle.x - character.x) * (nextObstacle.x - character.x));
+            inputs[1] = nextObstacle.height;
         }
-        character.update();
+
         this.doAction(character, this.characterControllers[i], inputs);
+
+        collisions.right.forEach((collision) => {
+            if (character.x + character.legBaseWidth / 2 + character.velocityX >= collision.object.x) {
+                character.x = collision.object.x - character.legBaseWidth / 2;
+                character.velocityX = 0;
+            }
+        });
+
+        collisions.left.forEach((collision) => {
+            if (character.x - character.legBaseWidth / 2 + character.velocityX <= collision.object.x) {
+                character.x = collision.object.x + character.legBaseWidth / 2;
+                character.velocityX = 0;
+            }
+        });
+
+        this.physics.update([character]);
+        character.update();
     }
 
     this.renderSimulation();

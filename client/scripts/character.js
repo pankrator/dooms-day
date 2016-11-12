@@ -13,7 +13,7 @@ var Character = function (x, y, color, images) {
     this.y = y;
     this.speed = 2;
     this.muscles = 7;
-    this.height = 150;
+    this.height = 200;
 
     this.velocityY = 0;
     this.velocityX = 0;
