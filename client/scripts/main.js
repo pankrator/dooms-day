@@ -10,9 +10,9 @@ const GeneticAlgorithm = require('./genetic/genetic_algorithm');
 const Renderer = require('./renderer');
 const ContentManager = require('./content_manager');
 
-const NUMBER_OF_INPUTS = 2;
-const NUMBER_OF_HIDDEN_LAYERS = 1;
-const NUMBER_OF_NODES_PER_HIDDEN = 6;
+const NUMBER_OF_INPUTS = 6;
+const NUMBER_OF_HIDDEN_LAYERS = 2;
+const NUMBER_OF_NODES_PER_HIDDEN = 8;
 const NUMBER_OF_OUTPUTS = 4;
 const POPULATION_SIZE = 16;
 
@@ -31,8 +31,6 @@ const colors = [
 function Game() {
     this.canvas = document.getElementById('game');
     this.context = this.canvas.getContext('2d');
-    this.statsCanvas = document.getElementById('stats');
-    this.statsContext = this.statsCanvas.getContext('2d');
     this.characterControllers = [];
     this.keys = new Array(300);
     this.characters = [];
@@ -41,7 +39,7 @@ function Game() {
     this.physics = new Physics();
     this.camera = new Camera({x: 600, y: 600}, {x: 30000, y: 30000});
     this.currentSimStep = 0;
-    this.renderer = new Renderer();
+    this.renderer = new Renderer(this.context, this.canvas, this.camera);
     this.contentManager = new ContentManager();
 };
 
@@ -71,41 +69,24 @@ Game.prototype.render = function () {
 }
 
 Game.prototype.renderSimulation = function () {
-    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    this.context.save();
-    this.context.translate(-this.camera.position.x, -this.camera.position.y);
-
-
+    const controller = this.characterControllers[_.indexOf(this.characters, this.bestCharacter)];
     const elements = this.levelGenerator.getElements();
-    this.context.beginPath();
-    this.context.lineWidth = 10;
-    this.context.strokeStyle = "blue";
-    elements.forEach((el) => {
-        if (el.type === 3) {
-            return;
-        }
-        this.context.moveTo(el.x, el.y);
-        this.context.lineTo(el.toX, el.toY);
-    });
-    this.context.stroke();
-    this.context.lineWidth = 1;
-
-    this.context.beginPath();
-    this.context.fillStyle = "green";
-    this.context.arc(this.bestCharacter.x, this.bestCharacter.y - this.bestCharacter.height / 2, 15, 0, Math.PI * 2);
-    this.context.fill();
-    
-    this.characters.forEach((character) => {
-        character.render(this.context);
-    });
-
-    this.context.restore();
+    this.renderer.render(this.characters, elements, controller, this.bestCharacter);
 }
 
 Game.prototype.doAction = function (character, controller, inputs) {
+    // HIGH
     inputs[0] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
     inputs[1] = MathHelpers.normalize(inputs[1] || 200, 5, 200);
+
+    // DOWN
+    inputs[2] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
+    inputs[3] = MathHelpers.normalize(inputs[1] || 200, 5, 200);
+
+    // GAP
+    inputs[4] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
+    inputs[5] = MathHelpers.normalize(inputs[1] || 150, 50, 140);
+
     const outputs = controller.activate(inputs);
     if (outputs[2] > 0.75) {
         character.muscles += outputs[1];
@@ -131,7 +112,7 @@ Game.prototype.update = function () {
     character.velocityX = 0;
     character.onGround = false;
 
-    const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
+    const nearestObstacles = this.levelGenerator.getNearestElementsSorted(character.x, character.y);
     let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
     collisions.down.forEach((collision) => {
         if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
@@ -170,15 +151,24 @@ Game.prototype.updateSimulation = function () {
         this.evaluateAndReset();
     }
     this.currentSimStep++;
-    this.bestCharacter = _.maxBy(this.characters, 'x');
-    this.camera.follow(this.characterToFollow || this.bestCharacter);
+    
+    let characterWithNoFallen = this.characters.filter((c) => !c.fallen);
+    this.bestCharacter = _.maxBy(characterWithNoFallen, 'x');
+    if (characterWithNoFallen.length === 0) {
+        this.evaluateAndReset();
+    }
+    this.camera.follow(this.bestCharacter || _.sample(characterWithNoFallen));
 
     for (let i = 0; i < this.characters.length; i++) {
-        let inputs = [];
         let character = this.characters[i];
+        if (character.fallen) {
+            continue;
+        }
+
+        let inputs = [];
 
         character.onGround = false;
-        const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
+        const nearestObstacles = this.levelGenerator.getNearestElementsSorted(character.x, character.y);
         let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
         collisions.down.forEach((collision) => {
             if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
@@ -188,11 +178,29 @@ Game.prototype.updateSimulation = function () {
             }
         });
 
-        const nextObstacle = this.levelGenerator.getNextObstacle(character.x, character.y, 1);
-        let dist = Math.sqrt((nextObstacle.x - character.x) * (nextObstacle.x - character.x));
+        const nextHighObstacle = this.levelGenerator.getNextHigh(character.x, character.y);
+        let dist = Math.sqrt((nextHighObstacle.x - character.x) * (nextHighObstacle.x - character.x));
         if (dist < 500) {
-            inputs[0] = Math.sqrt((nextObstacle.x - character.x) * (nextObstacle.x - character.x));
-            inputs[1] = nextObstacle.height;
+            inputs[0] = dist;
+            inputs[1] = nextHighObstacle.height;
+        }
+
+        const nextDownObstacle = this.levelGenerator.getNextDown(character.x, character.y);
+        dist = Math.sqrt((nextDownObstacle.x - character.x) * (nextDownObstacle.x - character.x));
+        if (dist < 500) {
+            inputs[2] = dist;
+            inputs[3] = nextDownObstacle.height;
+        }
+
+        const nextGap = this.levelGenerator.getNextGap(character.x, character.y);
+        dist = Math.sqrt((nextGap.x - character.x) * (nextGap.x - character.x));
+        if (dist < 500) {
+            inputs[4] = dist;
+            inputs[5] = nextGap.length;
+        }
+
+        if (this.levelGenerator.isPositionUnderLevel(character.x, character.y)) {
+            character.fallen = true;
         }
 
         this.doAction(character, this.characterControllers[i], inputs);
@@ -213,6 +221,7 @@ Game.prototype.updateSimulation = function () {
 
         this.physics.update([character]);
         character.update();
+        evaluationManager.evaluate(character, nextHighObstacle, nextDownObstacle, nextGap);
     }
 
     this.renderSimulation();
@@ -237,12 +246,14 @@ Game.prototype.evaluateAndReset = function () {
         this.evolutionController.individuals[index].fitness = character.x;
         character.x = 100;
         character.y = 300;
+        character.fallen = false;
     });
 
     this.evolutionController.nextGeneration();
     this.evolutionController.individuals.forEach((individual, index) => {
         this.characterControllers[index].updateWeights(individual.weights);
     });
+    console.log("generarion", this.evolutionController.generationCounter);
 }
 
 Game.prototype.handleInput = function () {
@@ -272,7 +283,7 @@ Game.prototype.main = function main() {
     const contentLoadPromise = this.__loadContent();
 
     contentLoadPromise.then(() => {
-        const characterImages = [this.contentManager.getImage('body.png'), 
+        const characterImages = [this.contentManager.getImage('body.png'),
                                  this.contentManager.getImage('left.png')];
 
         this.testCharacter = new Character(100, 300, "red", characterImages);
@@ -293,7 +304,7 @@ Game.prototype.main = function main() {
 
         this.levelGenerator.generate(700);
 
-        this.update();
+        this.updateSimulation();
     });
 
 };

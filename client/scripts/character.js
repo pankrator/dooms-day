@@ -21,6 +21,7 @@ var Character = function (x, y, color, images) {
     this.images = images;
     this.color = color || 'red';
 
+    this.onGroundSince = Date.now();
     this.onGround = true;
     this.randomHeadDisplacement = -DISPLACEMENT_HEAD_LIMIT;
     this.randomHeadDisplacementStep = DISPLACEMENT_HEAD_STEP;

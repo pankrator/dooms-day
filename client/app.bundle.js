@@ -52,6 +52,7 @@ var Character = function (x, y, color, images) {
     this.images = images;
     this.color = color || 'red';
 
+    this.onGroundSince = Date.now();
     this.onGround = true;
     this.randomHeadDisplacement = -DISPLACEMENT_HEAD_LIMIT;
     this.randomHeadDisplacementStep = DISPLACEMENT_HEAD_STEP;
@@ -131,7 +132,7 @@ Character.prototype.render = function (ctx) {
 }
 
 module.exports = Character;
-},{"./utils":10}],3:[function(require,module,exports){
+},{"./utils":11}],3:[function(require,module,exports){
 'use strict';
 
 let ContentManager = function() {
@@ -165,12 +166,17 @@ module.exports = ContentManager;
 },{}],4:[function(require,module,exports){
 'use strict';
 
+
+},{}],5:[function(require,module,exports){
+'use strict';
+
 const MathHelpers = require('../utils').MathHelpers;
 const ELITISM = 2;
 const MUTATION_RATE = 0.1;
 const MUTATION_AMOUNT = 0.3;
 
 let GeneticAlgorithm = function (populationSize, numberOfWeights) {
+    this.generationCounter = 0;
     this.populationSize = populationSize;
     this.individuals = [];
     this.numberOfWeights = numberOfWeights;
@@ -224,6 +230,8 @@ GeneticAlgorithm.prototype.crossover = function (mum, dad) {
 }
 
 GeneticAlgorithm.prototype.nextGeneration = function () {
+    this.generationCounter++;
+    
     let newIndividuals = [];
     this.individuals.sort((a, b) => { return b.fitness - a.fitness; });
 
@@ -250,7 +258,7 @@ let Genome = function () {
 }
 
 module.exports = GeneticAlgorithm;
-},{"../utils":10}],5:[function(require,module,exports){
+},{"../utils":11}],6:[function(require,module,exports){
 'use strict';
 
 const MathHelpers = require('../utils').MathHelpers;
@@ -368,7 +376,7 @@ let Layer = function (numberOfNeurons, inputsPerNeuron) {
 }
 
 module.exports = NeuralNet;
-},{"../utils":10}],6:[function(require,module,exports){
+},{"../utils":11}],7:[function(require,module,exports){
 'use strict';
 
 const PATH_TYPES = {
@@ -381,6 +389,7 @@ const PATH_TYPES = {
 
 let LevelGenerator = function (startX, startY) {
     this.elements = [];
+    this.sortedElements = [];
     this.startY = startY;
     this.startX = startX;
 }
@@ -405,17 +414,27 @@ LevelGenerator.prototype.generate = function (size) {
         currentX = element.toX;
         currentY = element.toY;
     }
+
+    this.sortedElements = _.cloneDeep(this.elements);
+    this.sortedElements.sort((a, b) => {
+        return a.x - b.x;
+    });
 }
 
-LevelGenerator.prototype.getFloorsByPosition = function (character) {
+LevelGenerator.prototype.isPositionUnderLevel = function (x, y) {
+    let index = _.findIndex(this.elements, (el) => { return x >= el.x && x <= el.toX });
+
+    return (y > this.elements[index].y);
+}
+
+LevelGenerator.prototype.getNearestElementsSorted = function (x, y) {
     let result = [];
-    let index = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && character.x >= el.x && character.x <= el.toX });
-    index = Math.max(index - 5, 0);
+
+    let index = _.sortedIndexBy(this.sortedElements, { x: x }, (el) => { return el.x; });
+    index = Math.max(index - 6, 0);
     const until = Math.min(this.elements.length, index + 15);
     for (let i = index; i < until; i++) {
-        if (this.elements[i].type == PATH_TYPES.FLOOR) {
-            result.push(this.elements[i]);
-        }
+        result.push(this.elements[i]);
     }
 
     return result;
@@ -435,35 +454,22 @@ LevelGenerator.prototype.getNearestElements = function (x, y) {
 }
 
 LevelGenerator.prototype.getNextObstacle = function (x, y, type) {
-    let index = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && x >= el.x && x <= el.toX });
+    let index = _.findIndex(this.elements, (el) => { return el.type !== PATH_TYPES.HIGH && x >= el.x && x <= el.toX });
     while (this.elements[index++].type != type);
 
-    return this.elements[index];
+    return this.elements[index - 1];
 }
 
-// TODO: Move this somewhere else
-LevelGenerator.prototype.getDataByPosition = function (character) {
-    const left = character.x - character.legBaseWidth / 2;
-    const right = character.x + character.legBaseWidth / 2;
+LevelGenerator.prototype.getNextHigh = function (x, y) {
+    return this.getNextObstacle(x, y, PATH_TYPES.HIGH)
+}
 
-    let currentFloorIndex = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && left >= el.x && left <= el.toX });
-    let currentFloorIndex2 = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && right >= el.x && right <= el.toX });
-    if (currentFloorIndex < 0 || currentFloorIndex2 < 0) {
-        return null;
-    }
-    const bottom = character.bottom;
-    if (Math.abs(this.elements[currentFloorIndex].y - bottom) > Math.abs(this.elements[currentFloorIndex2].y - bottom)) {
-        currentFloorIndex = currentFloorIndex2;
-    }
-    let result = {
-        floor: this.elements[currentFloorIndex]
-    };
+LevelGenerator.prototype.getNextDown = function (x, y) {
+    return this.getNextObstacle(x, y, PATH_TYPES.DOWN);
+}
 
-    while (currentFloorIndex < this.elements.length - 1 &&
-           this.elements[currentFloorIndex++].type === PATH_TYPES.FLOOR);
-    result.nextObstacle = this.elements[currentFloorIndex - 1]; 
-    
-    return result;
+LevelGenerator.prototype.getNextGap = function (x, y) {
+    return this.getNextObstacle(x, y, PATH_TYPES.GAP);
 }
 
 LevelGenerator.prototype.getStartX = function () {
@@ -490,7 +496,15 @@ function checkRestrictions(element, elements) {
         }
 
         return !_.takeRight(elements, 2).every((el) => {
-            el.type === PATH_TYPES.DOWN;
+            return el.type === PATH_TYPES.DOWN;
+        });
+    }
+    if (element.type === PATH_TYPES.GAP) {
+        if (elements.length === 0) {
+            return false;
+        }
+        return !_.takeRight(elements, 3).some((el) => {
+            return el.type == PATH_TYPES.GAP || el.type == PATH_TYPES.HIGH;
         });
     }
 
@@ -505,7 +519,7 @@ function getElementByType(type, xPosition, yPosition) {
     } else if (type === PATH_TYPES.DOWN) {
         return down(Math.floor(Math.random() * 120) + 50, xPosition, yPosition);
     } else if (type === PATH_TYPES.GAP) {
-        return gap(Math.floor(Math.random() * 100) + 120, xPosition, yPosition);
+        return gap(Math.floor(Math.random() * 100) + 50, xPosition, yPosition);
     }
 }
 
@@ -517,9 +531,9 @@ function getRandomPathType() {
     if (dice >= 0.40 && dice <= 0.70) {
         return 2;
     }
-    // if (dice <= 0.40 && dice >= 0.30) {
-    //     return 3;
-    // }
+    if (dice <= 0.40 && dice >= 0.30) {
+        return 3;
+    }
     return 0;
 }
 
@@ -568,7 +582,7 @@ function floor(length, x, y) {
 }
 
 module.exports = LevelGenerator;
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 "use strict";
 
 const MathHelpers = require("./utils").MathHelpers;
@@ -581,9 +595,9 @@ const GeneticAlgorithm = require('./genetic/genetic_algorithm');
 const Renderer = require('./renderer');
 const ContentManager = require('./content_manager');
 
-const NUMBER_OF_INPUTS = 2;
-const NUMBER_OF_HIDDEN_LAYERS = 1;
-const NUMBER_OF_NODES_PER_HIDDEN = 6;
+const NUMBER_OF_INPUTS = 6;
+const NUMBER_OF_HIDDEN_LAYERS = 2;
+const NUMBER_OF_NODES_PER_HIDDEN = 8;
 const NUMBER_OF_OUTPUTS = 4;
 const POPULATION_SIZE = 16;
 
@@ -602,8 +616,6 @@ const colors = [
 function Game() {
     this.canvas = document.getElementById('game');
     this.context = this.canvas.getContext('2d');
-    this.statsCanvas = document.getElementById('stats');
-    this.statsContext = this.statsCanvas.getContext('2d');
     this.characterControllers = [];
     this.keys = new Array(300);
     this.characters = [];
@@ -612,7 +624,7 @@ function Game() {
     this.physics = new Physics();
     this.camera = new Camera({x: 600, y: 600}, {x: 30000, y: 30000});
     this.currentSimStep = 0;
-    this.renderer = new Renderer();
+    this.renderer = new Renderer(this.context, this.canvas, this.camera);
     this.contentManager = new ContentManager();
 };
 
@@ -642,41 +654,24 @@ Game.prototype.render = function () {
 }
 
 Game.prototype.renderSimulation = function () {
-    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-    this.context.save();
-    this.context.translate(-this.camera.position.x, -this.camera.position.y);
-
-
+    const controller = this.characterControllers[_.indexOf(this.characters, this.bestCharacter)];
     const elements = this.levelGenerator.getElements();
-    this.context.beginPath();
-    this.context.lineWidth = 10;
-    this.context.strokeStyle = "blue";
-    elements.forEach((el) => {
-        if (el.type === 3) {
-            return;
-        }
-        this.context.moveTo(el.x, el.y);
-        this.context.lineTo(el.toX, el.toY);
-    });
-    this.context.stroke();
-    this.context.lineWidth = 1;
-
-    this.context.beginPath();
-    this.context.fillStyle = "green";
-    this.context.arc(this.bestCharacter.x, this.bestCharacter.y - this.bestCharacter.height / 2, 15, 0, Math.PI * 2);
-    this.context.fill();
-    
-    this.characters.forEach((character) => {
-        character.render(this.context);
-    });
-
-    this.context.restore();
+    this.renderer.render(this.characters, elements, controller, this.bestCharacter);
 }
 
 Game.prototype.doAction = function (character, controller, inputs) {
+    // HIGH
     inputs[0] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
     inputs[1] = MathHelpers.normalize(inputs[1] || 200, 5, 200);
+
+    // DOWN
+    inputs[2] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
+    inputs[3] = MathHelpers.normalize(inputs[1] || 200, 5, 200);
+
+    // GAP
+    inputs[4] = MathHelpers.normalize(inputs[0] || 500, 20, 500);
+    inputs[5] = MathHelpers.normalize(inputs[1] || 150, 50, 140);
+
     const outputs = controller.activate(inputs);
     if (outputs[2] > 0.75) {
         character.muscles += outputs[1];
@@ -702,7 +697,7 @@ Game.prototype.update = function () {
     character.velocityX = 0;
     character.onGround = false;
 
-    const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
+    const nearestObstacles = this.levelGenerator.getNearestElementsSorted(character.x, character.y);
     let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
     collisions.down.forEach((collision) => {
         if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
@@ -741,15 +736,24 @@ Game.prototype.updateSimulation = function () {
         this.evaluateAndReset();
     }
     this.currentSimStep++;
-    this.bestCharacter = _.maxBy(this.characters, 'x');
-    this.camera.follow(this.characterToFollow || this.bestCharacter);
+    
+    let characterWithNoFallen = this.characters.filter((c) => !c.fallen);
+    this.bestCharacter = _.maxBy(characterWithNoFallen, 'x');
+    if (characterWithNoFallen.length === 0) {
+        this.evaluateAndReset();
+    }
+    this.camera.follow(this.bestCharacter || _.sample(characterWithNoFallen));
 
     for (let i = 0; i < this.characters.length; i++) {
-        let inputs = [];
         let character = this.characters[i];
+        if (character.fallen) {
+            continue;
+        }
+
+        let inputs = [];
 
         character.onGround = false;
-        const nearestObstacles = this.levelGenerator.getNearestElements(character.x, character.y);
+        const nearestObstacles = this.levelGenerator.getNearestElementsSorted(character.x, character.y);
         let collisions = this.physics.getPossibleCollision(character, nearestObstacles, {down: true, right: true, left: true});
         collisions.down.forEach((collision) => {
             if (character.bottom + character.velocityY >= collision.object.y && character.velocityY > 0) {
@@ -759,11 +763,29 @@ Game.prototype.updateSimulation = function () {
             }
         });
 
-        const nextObstacle = this.levelGenerator.getNextObstacle(character.x, character.y, 1);
-        let dist = Math.sqrt((nextObstacle.x - character.x) * (nextObstacle.x - character.x));
+        const nextHighObstacle = this.levelGenerator.getNextHigh(character.x, character.y);
+        let dist = Math.sqrt((nextHighObstacle.x - character.x) * (nextHighObstacle.x - character.x));
         if (dist < 500) {
-            inputs[0] = Math.sqrt((nextObstacle.x - character.x) * (nextObstacle.x - character.x));
-            inputs[1] = nextObstacle.height;
+            inputs[0] = dist;
+            inputs[1] = nextHighObstacle.height;
+        }
+
+        const nextDownObstacle = this.levelGenerator.getNextDown(character.x, character.y);
+        dist = Math.sqrt((nextDownObstacle.x - character.x) * (nextDownObstacle.x - character.x));
+        if (dist < 500) {
+            inputs[2] = dist;
+            inputs[3] = nextDownObstacle.height;
+        }
+
+        const nextGap = this.levelGenerator.getNextGap(character.x, character.y);
+        dist = Math.sqrt((nextGap.x - character.x) * (nextGap.x - character.x));
+        if (dist < 500) {
+            inputs[4] = dist;
+            inputs[5] = nextGap.length;
+        }
+
+        if (this.levelGenerator.isPositionUnderLevel(character.x, character.y)) {
+            character.fallen = true;
         }
 
         this.doAction(character, this.characterControllers[i], inputs);
@@ -784,6 +806,7 @@ Game.prototype.updateSimulation = function () {
 
         this.physics.update([character]);
         character.update();
+        evaluationManager.evaluate(character, nextHighObstacle, nextDownObstacle, nextGap);
     }
 
     this.renderSimulation();
@@ -808,12 +831,14 @@ Game.prototype.evaluateAndReset = function () {
         this.evolutionController.individuals[index].fitness = character.x;
         character.x = 100;
         character.y = 300;
+        character.fallen = false;
     });
 
     this.evolutionController.nextGeneration();
     this.evolutionController.individuals.forEach((individual, index) => {
         this.characterControllers[index].updateWeights(individual.weights);
     });
+    console.log("generarion", this.evolutionController.generationCounter);
 }
 
 Game.prototype.handleInput = function () {
@@ -843,7 +868,7 @@ Game.prototype.main = function main() {
     const contentLoadPromise = this.__loadContent();
 
     contentLoadPromise.then(() => {
-        const characterImages = [this.contentManager.getImage('body.png'), 
+        const characterImages = [this.contentManager.getImage('body.png'),
                                  this.contentManager.getImage('left.png')];
 
         this.testCharacter = new Character(100, 300, "red", characterImages);
@@ -864,14 +889,14 @@ Game.prototype.main = function main() {
 
         this.levelGenerator.generate(700);
 
-        this.update();
+        this.updateSimulation();
     });
 
 };
 let game = new Game();
 game.main();
 
-},{"./camera":1,"./character":2,"./content_manager":3,"./genetic/genetic_algorithm":4,"./genetic/neural_net":5,"./level_generator":6,"./physics":8,"./renderer":9,"./utils":10}],8:[function(require,module,exports){
+},{"./camera":1,"./character":2,"./content_manager":3,"./genetic/genetic_algorithm":5,"./genetic/neural_net":6,"./level_generator":7,"./physics":9,"./renderer":10,"./utils":11}],9:[function(require,module,exports){
 'use strict';
 
 const WORLD_GRAVITY = 0.3;
@@ -969,10 +994,14 @@ Physics.prototype.isPointOnLineSegment = function(line, point) {
 
 
 module.exports = Physics;
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 'use strict';
 
-let Renderer = function () {}
+let Renderer = function (context, canvas, camera) {
+    this.context = context;
+    this.canvas = canvas;
+    this.camera = camera;
+}
 
 Renderer.prototype.renderPopulationIcon = function (ctx, characters, individuals) {
     ctx.strokeStyle = "black";
@@ -988,13 +1017,99 @@ Renderer.prototype.renderPopulationIcon = function (ctx, characters, individuals
     });
 }
 
+Renderer.prototype.renderNeuralNet = function (ctx, neuralNet) {
+    let maxHeight = 240;
+    let yBetween = 200 / neuralNet.neuronsPerHiddenLayer;
+
+    const weights = neuralNet.getWeights();
+    
+    let xOffset = 400;
+    let yOffset = 50;
+    ctx.strokeStyle = "red";
+    for (let i = 0; i < neuralNet.numberOfHiddenLayers; i++) {
+        for (let j = 0; j < neuralNet.neuronsPerHiddenLayer; j++) {
+            ctx.beginPath();
+            ctx.arc(xOffset, yOffset, 10, 0, Math.PI * 2);
+            ctx.stroke();
+            yOffset += yBetween;
+        }
+        yOffset = 50;
+        xOffset += 80;
+    }
+
+    yOffset = 50 + yBetween * ((neuralNet.neuronsPerHiddenLayer - neuralNet.numberOfOutputs) / 2);
+    for (let i = 0; i < neuralNet.numberOfOutputs; i++) {
+        ctx.beginPath();
+        ctx.arc(xOffset, yOffset, 10, 0, Math.PI * 2);
+        ctx.stroke();
+        yOffset += yBetween;
+    }
+
+    // xOffset = 400;
+    // yOffset = 50;
+    // for (let i = 0; i < neuralNet.numberOfHiddenLayers; i++) {
+    //     for (let j = 0; j < neuralNet.neuronsPerHiddenLayer; j++) {
+    //         for (let k = 0; k < neuralNet.neuronsPerHiddenLayer; k++) {
+    //             this.renderLineWithText(ctx, xOffset, yOffset, (xOffset + 80), yOffset + (k+1) * (yBetween), "asd");
+    //         }
+    //         yOffset = 50 + j * yBetween;
+    //     }
+    //     xOffset += 80;
+    // }
+}
+
+Renderer.prototype.renderLineWithText = function (ctx, x, y, toX, toY, text) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    ctx.fillStyle = "black";
+    ctx.fillText((toX - x) / 2, (toY - y) / 2, text);
+    ctx.fill();
+}
+
 Renderer.prototype.clearCanvas = function (canvas, context) {
     context.clearRect(0, 0, canvas.width, canvas.height);
 }
 
+Renderer.prototype.render = function (characters, elements, controller, bestCharacter) {
+    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    this.renderNeuralNet(this.context, controller);
+
+    this.context.save();
+    this.context.translate(-this.camera.position.x, -this.camera.position.y);
+
+    this.context.beginPath();
+    this.context.lineWidth = 10;
+    this.context.strokeStyle = "blue";
+    elements.forEach((el) => {
+        if (el.type === 3) {
+            return;
+        }
+        this.context.moveTo(el.x, el.y);
+        this.context.lineTo(el.toX, el.toY);
+    });
+    this.context.stroke();
+    this.context.lineWidth = 1;
+
+    this.context.beginPath();
+    this.context.fillStyle = "green";
+    this.context.arc(bestCharacter.x, bestCharacter.y - bestCharacter.height / 2, 15, 0, Math.PI * 2);
+    this.context.fill();
+    
+    characters.forEach((character) => {
+        if (!character.fallen) {
+            character.render(this.context);
+        }
+    });
+
+    this.context.restore();
+}
+
 
 module.exports = Renderer;
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
 
 function sendData(path, verb, body) {
@@ -1078,7 +1193,7 @@ module.exports = {
     MathHelpers: MathHelpers,
 };
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 "use strict";
 
 function Vector(x, y) {
@@ -1295,4 +1410,4 @@ Vector.angleBetween = function (a, b) {
 
 module.exports = Vector;
 
-},{}]},{},[1,2,3,6,7,8,9,10,11]);
+},{}]},{},[1,2,3,4,7,8,9,10,11,12]);

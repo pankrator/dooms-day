@@ -6,6 +6,7 @@ const MUTATION_RATE = 0.1;
 const MUTATION_AMOUNT = 0.3;
 
 let GeneticAlgorithm = function (populationSize, numberOfWeights) {
+    this.generationCounter = 0;
     this.populationSize = populationSize;
     this.individuals = [];
     this.numberOfWeights = numberOfWeights;
@@ -59,6 +60,8 @@ GeneticAlgorithm.prototype.crossover = function (mum, dad) {
 }
 
 GeneticAlgorithm.prototype.nextGeneration = function () {
+    this.generationCounter++;
+    
     let newIndividuals = [];
     this.individuals.sort((a, b) => { return b.fitness - a.fitness; });
 

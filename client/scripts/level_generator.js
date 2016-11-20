@@ -10,6 +10,7 @@ const PATH_TYPES = {
 
 let LevelGenerator = function (startX, startY) {
     this.elements = [];
+    this.sortedElements = [];
     this.startY = startY;
     this.startX = startX;
 }
@@ -34,17 +35,27 @@ LevelGenerator.prototype.generate = function (size) {
         currentX = element.toX;
         currentY = element.toY;
     }
+
+    this.sortedElements = _.cloneDeep(this.elements);
+    this.sortedElements.sort((a, b) => {
+        return a.x - b.x;
+    });
 }
 
-LevelGenerator.prototype.getFloorsByPosition = function (character) {
+LevelGenerator.prototype.isPositionUnderLevel = function (x, y) {
+    let index = _.findIndex(this.elements, (el) => { return x >= el.x && x <= el.toX });
+
+    return (y > this.elements[index].y);
+}
+
+LevelGenerator.prototype.getNearestElementsSorted = function (x, y) {
     let result = [];
-    let index = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && character.x >= el.x && character.x <= el.toX });
-    index = Math.max(index - 5, 0);
+
+    let index = _.sortedIndexBy(this.sortedElements, { x: x }, (el) => { return el.x; });
+    index = Math.max(index - 6, 0);
     const until = Math.min(this.elements.length, index + 15);
     for (let i = index; i < until; i++) {
-        if (this.elements[i].type == PATH_TYPES.FLOOR) {
-            result.push(this.elements[i]);
-        }
+        result.push(this.elements[i]);
     }
 
     return result;
@@ -64,35 +75,22 @@ LevelGenerator.prototype.getNearestElements = function (x, y) {
 }
 
 LevelGenerator.prototype.getNextObstacle = function (x, y, type) {
-    let index = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && x >= el.x && x <= el.toX });
+    let index = _.findIndex(this.elements, (el) => { return el.type !== PATH_TYPES.HIGH && x >= el.x && x <= el.toX });
     while (this.elements[index++].type != type);
 
-    return this.elements[index];
+    return this.elements[index - 1];
 }
 
-// TODO: Move this somewhere else
-LevelGenerator.prototype.getDataByPosition = function (character) {
-    const left = character.x - character.legBaseWidth / 2;
-    const right = character.x + character.legBaseWidth / 2;
+LevelGenerator.prototype.getNextHigh = function (x, y) {
+    return this.getNextObstacle(x, y, PATH_TYPES.HIGH)
+}
 
-    let currentFloorIndex = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && left >= el.x && left <= el.toX });
-    let currentFloorIndex2 = _.findIndex(this.elements, (el) => { return el.type === PATH_TYPES.FLOOR && right >= el.x && right <= el.toX });
-    if (currentFloorIndex < 0 || currentFloorIndex2 < 0) {
-        return null;
-    }
-    const bottom = character.bottom;
-    if (Math.abs(this.elements[currentFloorIndex].y - bottom) > Math.abs(this.elements[currentFloorIndex2].y - bottom)) {
-        currentFloorIndex = currentFloorIndex2;
-    }
-    let result = {
-        floor: this.elements[currentFloorIndex]
-    };
+LevelGenerator.prototype.getNextDown = function (x, y) {
+    return this.getNextObstacle(x, y, PATH_TYPES.DOWN);
+}
 
-    while (currentFloorIndex < this.elements.length - 1 &&
-           this.elements[currentFloorIndex++].type === PATH_TYPES.FLOOR);
-    result.nextObstacle = this.elements[currentFloorIndex - 1]; 
-    
-    return result;
+LevelGenerator.prototype.getNextGap = function (x, y) {
+    return this.getNextObstacle(x, y, PATH_TYPES.GAP);
 }
 
 LevelGenerator.prototype.getStartX = function () {
@@ -119,7 +117,15 @@ function checkRestrictions(element, elements) {
         }
 
         return !_.takeRight(elements, 2).every((el) => {
-            el.type === PATH_TYPES.DOWN;
+            return el.type === PATH_TYPES.DOWN;
+        });
+    }
+    if (element.type === PATH_TYPES.GAP) {
+        if (elements.length === 0) {
+            return false;
+        }
+        return !_.takeRight(elements, 3).some((el) => {
+            return el.type == PATH_TYPES.GAP || el.type == PATH_TYPES.HIGH;
         });
     }
 
@@ -134,7 +140,7 @@ function getElementByType(type, xPosition, yPosition) {
     } else if (type === PATH_TYPES.DOWN) {
         return down(Math.floor(Math.random() * 120) + 50, xPosition, yPosition);
     } else if (type === PATH_TYPES.GAP) {
-        return gap(Math.floor(Math.random() * 100) + 120, xPosition, yPosition);
+        return gap(Math.floor(Math.random() * 100) + 50, xPosition, yPosition);
     }
 }
 
@@ -146,9 +152,9 @@ function getRandomPathType() {
     if (dice >= 0.40 && dice <= 0.70) {
         return 2;
     }
-    // if (dice <= 0.40 && dice >= 0.30) {
-    //     return 3;
-    // }
+    if (dice <= 0.40 && dice >= 0.30) {
+        return 3;
+    }
     return 0;
 }
 
